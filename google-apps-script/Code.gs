@@ -5,6 +5,7 @@ const SETTINGS = Object.freeze({
   testSheetName: 'ทดสอบการเชื่อมต่อ',
   allowedOrigins: [
     'https://ever-after-wedding-invitation-261026.tanawat-noi09.chatgpt.site',
+    'https://tanawat09.github.io',
     'http://127.0.0.1:4173'
   ],
   promptPayId: '0623452359',
