@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#fffaf4">
+  <meta name="robots" content="noindex,nofollow">
+  <script src="admin-auth.js"></script>
+  <script>
+    // Without a matching sign-in from login.html, go there first. Static hosting: this keeps casual visitors out, not a determined one.
+    (() => { const auth = window.EARN_ARM_ADMIN_AUTH; let ok = false; try { ok = !!auth && [sessionStorage, localStorage].some(s => s.getItem('earn-arm-admin') === auth.hash); } catch {} if (!ok) location.replace('login.html'); })();
+  </script>
+  <title>หลังบ้าน — Earn & Arm</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;1,400&family=Noto+Sans+Thai:wght@400;500;600&family=Charm:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="admin.css">
+  <script src="admin.js" defer></script>
+</head>
+<body data-view="edit">
+  <header class="admin-top">
+    <a class="admin-brand" href="index.html" target="_blank" rel="noopener" aria-label="เปิดการ์ดเชิญในแท็บใหม่"><img src="assets/earn-arm-monogram.png" alt="Earn & Arm" width="483" height="337"></a>
+    <div class="admin-title"><h1>หลังบ้านการ์ดเชิญ</h1><p id="saveStatus" role="status">กำลังโหลดข้อมูลการ์ด…</p></div>
+    <nav class="admin-links" aria-label="ลิงก์ของคู่บ่าวสาว"><a href="index.html" target="_blank" rel="noopener">เปิดการ์ด ↗</a><a href="wishes.html" target="_blank" rel="noopener">หน้าอวยพร ↗</a><button type="button" id="logoutButton">ออกจากระบบ</button></nav>
+  </header>
+  <div class="admin-switch" role="group" aria-label="สลับมุมมอง"><button type="button" data-view="edit" aria-pressed="true">แก้ไข</button><button type="button" data-view="preview" aria-pressed="false">ดูตัวอย่าง</button></div>
+  <main class="admin-layout">
+    <section class="admin-editor" aria-label="แก้ไขการ์ด">
+      <p class="draft-note" id="draftNote" hidden></p>
+            <div class="editor-tabs" role="tablist" aria-label="หมวดการปรับแต่ง"><button role="tab" id="tab-details" aria-controls="panel-details" data-tab="details" aria-selected="true">รายละเอียด</button><button role="tab" id="tab-photos" aria-controls="panel-photos" data-tab="photos" aria-selected="false">รูป</button><button role="tab" id="tab-media" aria-controls="panel-media" data-tab="media" aria-selected="false">เพลง · วิดีโอ</button><button role="tab" id="tab-schedule" aria-controls="panel-schedule" data-tab="schedule" aria-selected="false">กำหนดการ</button><button role="tab" id="tab-share" aria-controls="panel-share" data-tab="share" aria-selected="false">ส่งให้แขก</button></div>
+      <div data-panel="details" id="panel-details" role="tabpanel" aria-labelledby="tab-details">
+        <div class="field-row"><label class="field"><span>ชื่อเจ้าสาว (ภาษาอังกฤษ)</span><input data-field="brideEn" maxlength="40"></label><label class="field"><span>ชื่อเจ้าบ่าว (ภาษาอังกฤษ)</span><input data-field="groomEn" maxlength="40"></label></div>
+        <label class="field"><span>ชื่อเจ้าสาวที่ใช้ในคำเชิญ</span><input data-field="brideFull" maxlength="120"></label><label class="field"><span>ชื่อเจ้าบ่าวที่ใช้ในคำเชิญ</span><input data-field="groomFull" maxlength="120"></label>
+        <label class="field"><span>เจ้าภาพฝ่ายเจ้าสาว</span><textarea data-field="brideParents" style="min-height:75px"></textarea></label><label class="field"><span>เจ้าภาพฝ่ายเจ้าบ่าว</span><textarea data-field="groomParents" style="min-height:75px"></textarea></label>
+        <div class="field-row"><label class="field"><span>วันที่จัดงาน</span><input type="date" data-field="date" min="2020-01-01" max="2100-12-31"></label><label class="field"><span>เวลาเริ่มงาน (ไทย)</span><input type="time" data-field="start"></label></div>
+        <label class="field"><span>ข้อความเชิญ</span><textarea data-field="invitation"></textarea></label><label class="field"><span>ครอบครัว / เจ้าภาพ</span><textarea data-field="family" style="min-height:70px"></textarea></label><label class="field"><span>เรื่องราวของเรา</span><textarea data-field="story"></textarea></label><label class="field"><span>ชื่อสถานที่</span><input data-field="venue" maxlength="150"></label><label class="field"><span>ที่อยู่ / รายละเอียดการเดินทาง</span><textarea data-field="address"></textarea></label><label class="field"><span>ลิงก์ Google Maps</span><input type="url" data-field="mapUrl" placeholder="https://maps.app.goo.gl/…"><small>ใส่ลิงก์แผนที่ของสถานที่จริงก่อนส่งให้แขก</small></label><label class="field"><span>ลิงก์ยืนยันร่วมงาน (ถ้ามี)</span><input type="url" data-field="rsvpUrl" placeholder="https://forms.gle/…"><small>รองรับลิงก์แบบฟอร์มหรือ LINE สำหรับให้แขกติดต่อ</small></label><label class="field"><span>ข้อความขอบคุณ</span><textarea data-field="closing"></textarea></label><label class="field"><span><input type="checkbox" id="demoCheck" style="width:auto;min-height:auto"> แสดงแถบ “แบบตัวอย่าง”</span></label>
+      </div>
+      <div data-panel="photos" id="panel-photos" role="tabpanel" aria-labelledby="tab-photos" hidden>
+        <p class="admin-hint">รูปใหญ่จะถูกย่อให้อัตโนมัติ การ์ดจึงเปิดเร็วบนมือถือ ทุกการเปลี่ยนแปลงเห็นในตัวอย่างทันที</p>
+        <h3 class="editor-section-title">แกลเลอรี <span class="tally" id="galleryTally"></span></h3>
+        <label class="photo-drop" id="galleryDrop"><input type="file" id="galleryUpload" multiple accept="image/*"><span class="photo-drop-plus" aria-hidden="true">＋</span><strong>เพิ่มรูปในแกลเลอรี</strong><small>เลือกได้หลายรูป หรือลากรูปมาวางตรงนี้ · สูงสุด 20 รูป</small></label>
+        <div class="photo-grid" id="galleryEditor"></div>
+        <h3 class="editor-section-title">รูปหลักของการ์ด</h3>
+        <div class="photo-slots" id="photoSlots"></div>
+      </div>
+      <div data-panel="media" id="panel-media" role="tabpanel" aria-labelledby="tab-media" hidden>
+        <h3 class="editor-section-title">เพลงประกอบ</h3><label class="field"><span>แหล่งเพลง</span><select id="musicSource" data-field="musicSource"><option value="youtube">YouTube · ปรับช่วงเวลาได้</option><option value="file">ไฟล์เพลง · เลือกช่วงเวลาได้</option></select></label><div id="youtubeMusicSettings"><label class="field"><span>ลิงก์ YouTube สำหรับเพลง</span><input type="url" id="musicYoutubeInput" placeholder="https://www.youtube.com/watch?v=…"><small>ใช้เสียงตามคลิปต้นฉบับผ่านเครื่องเล่น YouTube ต้องเชื่อมต่ออินเทอร์เน็ต หากต้องการดนตรีล้วนให้อัปโหลดไฟล์เวอร์ชันบรรเลง</small></label><div class="field-row"><label class="field"><span>เริ่มที่ (นาที:วินาที)</span><input id="musicStartInput" placeholder="01:00" aria-describedby="musicTimingHint"></label><label class="field"><span>จบที่ (นาที:วินาที)</span><input id="musicEndInput" placeholder="01:30" aria-describedby="musicTimingHint"></label></div><p class="media-status" id="musicTimingHint">ช่วงเริ่มต้น 01:00–01:30 เป็นช่วงตัวอย่าง ปรับได้เอง</p><label class="field"><span><input type="checkbox" id="musicLoopCheck" style="width:auto;min-height:auto"> เล่นช่วงที่เลือกวนซ้ำ</span></label><button class="small-button" id="previewYoutubeMusic">ฟังช่วงที่เลือก ↗</button></div><div id="fileMusicSettings" hidden><label class="field"><span>อัปโหลดเพลง</span><input type="file" id="musicUpload" accept="audio/mpeg,audio/mp4,audio/wav,audio/ogg"><small>MP3 / M4A / WAV / OGG ไม่เกิน 15 MB เพลงเริ่มเมื่อแขกแตะเปิดคำเชิญหรือเปิดเสียง</small></label><div class="field-row"><label class="field"><span>เริ่มไฟล์ที่ (นาที:วินาที)</span><input id="fileStartInput" placeholder="00:00"></label><label class="field"><span>จบไฟล์ที่ (นาที:วินาที)</span><input id="fileEndInput" placeholder="เว้นว่างเพื่อเล่นจนจบ"></label></div><label class="field"><span><input type="checkbox" id="fileLoopCheck" style="width:auto;min-height:auto"> เล่นไฟล์ช่วงที่เลือกวนซ้ำ</span></label><button class="text-button" id="resetMusic">ใช้เพลงบรรเลงตัวอย่าง</button></div><p class="media-status" id="musicStatus" style="margin-top:14px">ดาวหางฮัลเลย์ — fellow fellow</p>
+        <h3 class="editor-section-title" style="margin-top:30px">วิดีโอของเรา</h3><label class="field"><span>ลิงก์ YouTube</span><input type="url" id="youtubeInput" placeholder="https://www.youtube.com/watch?v=…"><small>ใส่ลิงก์วิดีโอที่อนุญาตให้ฝังได้ หรือเลือกไฟล์ด้านล่าง การเลือกแหล่งใหม่จะแทนที่แหล่งเดิม</small></label><label class="field"><span>หรืออัปโหลดวิดีโอ</span><input type="file" id="videoUpload" accept="video/mp4,video/webm"><small>MP4 / WebM ไม่เกิน 30 MB แนะนำคลิปสั้นเพื่อให้เปิดบนมือถือได้เร็ว</small></label><p class="media-status" id="videoStatus">ยังไม่ได้เพิ่มวิดีโอ</p><button class="text-button" id="removeVideo">นำวิดีโอออก</button><div class="empty-hint">เลือกเพลง รูป และวิดีโอที่คุณมีสิทธิ์ใช้งาน ไฟล์ที่เลือกเก็บเป็นร่างในอุปกรณ์นี้และรวมอยู่ในไฟล์การ์ดที่ดาวน์โหลด</div>
+      </div>
+      <div data-panel="schedule" id="panel-schedule" role="tabpanel" aria-labelledby="tab-schedule" hidden><p class="admin-hint">ปรับเวลาและชื่อพิธีได้ทั้ง 4 ช่วง</p><div id="scheduleEditor"></div><label class="field"><span>ข้อความโทนสีชุด</span><input data-field="dress" maxlength="160"></label><div class="field-row" id="colorEditor"></div></div>
+      <div data-panel="share" id="panel-share" role="tabpanel" aria-labelledby="tab-share" hidden>
+        <h3 class="editor-section-title">ลิงก์เชิญใส่ชื่อแขก</h3>
+        <label class="field"><span>ที่อยู่การ์ดบนเว็บ</span><input type="url" id="siteBase"><small>หน้าปกจะขึ้นว่า “เรียน …” ตามชื่อในลิงก์</small></label>
+        <label class="field"><span>ชื่อแขก (บรรทัดละหนึ่งชื่อ)</span><textarea id="guestNames" placeholder="คุณสมชาย และครอบครัว&#10;ครูสมศรี ใจดี"></textarea></label>
+        <div class="guest-links" id="guestLinks"></div>
+        <button class="small-button" id="copyAllLinks" type="button" hidden>คัดลอกลิงก์ทั้งหมด</button>
+        <h3 class="editor-section-title">คำอวยพรจากแขก</h3>
+        <p class="admin-hint">คำอวยพร รูป และสลิปที่แขกส่งมาเก็บใน Google Sheet ของคุณ เปิดได้เฉพาะบัญชี Google ของเจ้าของ</p>
+        <div class="admin-shortcuts"><a class="small-button" id="sheetLink" target="_blank" rel="noopener">เปิด Google Sheet ↗</a><a class="small-button" id="scriptLink" target="_blank" rel="noopener">เปิด Apps Script ↗</a></div>
+        <h3 class="editor-section-title">นำการ์ดที่แก้ขึ้นเว็บ</h3>
+        <ol class="admin-steps"><li>กด “ดาวน์โหลดไฟล์ขึ้นเว็บ” ด้านล่าง จะได้ไฟล์ <code>index.html</code></li><li>นำไฟล์ไปแทน <code>index.html</code> ในโฟลเดอร์เว็บ (dist) แล้วเผยแพร่ใหม่</li><li>เปิดการ์ดบนเว็บเพื่อตรวจว่าแขกเห็นถูกต้อง</li></ol>
+      </div>
+      <div class="admin-actions">
+        <button class="button" id="downloadSite" type="button">ดาวน์โหลดไฟล์ขึ้นเว็บ ↓</button>
+        <button class="button outline" id="downloadSingle" type="button">ดาวน์โหลดการ์ดไฟล์เดียว ↓</button>
+        <button class="text-button" id="resetButton" type="button">ทิ้งร่าง กลับไปใช้ข้อมูลบนเว็บ</button>
+      </div>
+    </section>
+    <section class="admin-preview" aria-label="ตัวอย่างการ์ด">
+      <div class="preview-bar"><span>ตัวอย่างการ์ดแบบที่แขกเห็น</span><div class="preview-size" role="group" aria-label="ขนาดจอตัวอย่าง"><button type="button" data-size="phone" aria-pressed="true">มือถือ</button><button type="button" data-size="desktop" aria-pressed="false">จอคอม</button></div></div>
+      <div class="preview-stage" id="previewStage"><iframe id="preview" src="index.html?preview" title="ตัวอย่างการ์ดเชิญ" allow="autoplay"></iframe></div>
+    </section>
+  </main>
+  <div class="toast" id="toast" role="status" hidden></div>
+</body>
+</html>
