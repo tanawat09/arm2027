@@ -54,11 +54,15 @@
         <h3 class="editor-section-title">คำอวยพรจากแขก</h3>
         <p class="admin-hint">คำอวยพร รูป และสลิปที่แขกส่งมาเก็บใน Google Sheet ของคุณ เปิดได้เฉพาะบัญชี Google ของเจ้าของ</p>
         <div class="admin-shortcuts"><a class="small-button" id="sheetLink" target="_blank" rel="noopener">เปิด Google Sheet ↗</a><a class="small-button" id="scriptLink" target="_blank" rel="noopener">เปิด Apps Script ↗</a></div>
-        <h3 class="editor-section-title">นำการ์ดที่แก้ขึ้นเว็บ</h3>
-        <ol class="admin-steps"><li>กด “ดาวน์โหลดไฟล์ขึ้นเว็บ” ด้านล่าง จะได้ไฟล์ <code>index.html</code></li><li>นำไฟล์ไปแทน <code>index.html</code> ในโฟลเดอร์เว็บ (dist) แล้วเผยแพร่ใหม่</li><li>เปิดการ์ดบนเว็บเพื่อตรวจว่าแขกเห็นถูกต้อง</li></ol>
+        <h3 class="editor-section-title" id="githubTitle">เชื่อมเว็บกับ GitHub</h3>
+        <p class="admin-hint">ใส่ token ครั้งเดียวต่อเครื่อง แล้วกด “บันทึกขึ้นเว็บ” ได้เลย token เก็บในเบราว์เซอร์เครื่องนี้เท่านั้น ไม่ขึ้นเว็บ</p>
+        <p class="github-state" id="githubState">ยังไม่ได้เชื่อม</p>
+        <label class="field"><span>GitHub token (Fine-grained · repo arm2027 · Contents: Read and write)</span><input type="password" id="githubToken" autocomplete="off" spellcheck="false" placeholder="github_pat_…"></label>
+        <div class="admin-shortcuts"><button class="small-button" id="githubSave" type="button">เชื่อม GitHub</button><button class="text-button" id="githubForget" type="button" hidden>เลิกเชื่อมเครื่องนี้</button><a class="small-button" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">สร้าง token ↗</a></div>
       </div>
       <div class="admin-actions">
-        <button class="button" id="downloadSite" type="button">ดาวน์โหลดไฟล์ขึ้นเว็บ ↓</button>
+        <button class="button publish" id="publishButton" type="button">บันทึกขึ้นเว็บ ↑</button>
+        <button class="button outline" id="downloadSite" type="button">ดาวน์โหลด index.html ↓</button>
         <button class="button outline" id="downloadSingle" type="button">ดาวน์โหลดการ์ดไฟล์เดียว ↓</button>
         <button class="text-button" id="resetButton" type="button">ทิ้งร่าง กลับไปใช้ข้อมูลบนเว็บ</button>
       </div>
