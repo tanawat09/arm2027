@@ -3,12 +3,14 @@
   const cfg = window.EARN_ARM_GUESTBOOK;
   const $ = selector => document.querySelector(selector);
   const form = $('#wishesForm');
-  const state = { photo: '', slip: '', preparing: 0, busy: false, ready: false, saved: false, pending: null, health: null, attempt: null, toast: null };
+  const state = { photo: '', slip: '', preparing: 0, postcard: null, busy: false, ready: false, saved: false, pending: null, health: null, attempt: null, toast: null };
   const endpointValid = () => /^https:\/\/script\.google\.com\/macros\/s\/[A-Za-z0-9_-]+\/exec$/.test(cfg.endpoint || '');
   function toast(message) { $('#toast').textContent = message; $('#toast').hidden = false; clearTimeout(state.toast); state.toast = setTimeout(() => $('#toast').hidden = true, 4500); }
   function status(message, ready = false) { $('#connectionStatus').textContent = message; $('#connectionStatus').classList.toggle('ready', ready); }
-  function setBusy(busy) { state.busy = busy; [...form.elements].forEach(el => el.disabled = busy); $('#submitButton').disabled = busy || !state.ready; $('#submitButton span').textContent = busy ? 'กำลังส่งคำอวยพร…' : 'ส่งคำอวยพร & สร้างโปสการ์ด'; }
-  function showError(message) { $('#formError').textContent = message; $('#formError').hidden = !message; }
+  // There is a send button under the photo and another under the slip; both submit the same form.
+  const sendButtons = () => [...form.querySelectorAll('button[type=submit]')];
+  function setBusy(busy) { state.busy = busy; [...form.elements].forEach(el => el.disabled = busy); sendButtons().forEach(button => { button.disabled = busy || !state.ready; button.querySelector('span').textContent = busy ? 'กำลังส่งคำอวยพร…' : button.dataset.label; }); }
+  function showError(message) { $('#formError').textContent = message; $('#formError').hidden = !message; if (message) $('#formError').scrollIntoView({ block: 'nearest', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' }); }
   function celebrate() {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     const canvas = $('#petals'), ctx = canvas.getContext('2d'), dpr = Math.min(devicePixelRatio || 1, 2), colors = ['#f7c95c', '#f2aeb6', '#fff7ec', '#f8dca6', '#d4a283', '#f6bdc3'];
@@ -27,7 +29,7 @@
   }
   function trustedMessage(origin) { try { const u = new URL(origin); return u.protocol === 'https:' && (u.hostname === 'script.google.com' || u.hostname === 'script.googleusercontent.com' || u.hostname.endsWith('-script.googleusercontent.com')); } catch { return false; } }
   function connect() {
-    state.ready = false; $('#submitButton').disabled = true;
+    state.ready = false; sendButtons().forEach(button => button.disabled = true);
     if (!endpointValid()) { status('สมุดคำอวยพรออนไลน์กำลังเตรียมเปิดรับ · สามารถดูโปสการ์ดตัวอย่างได้ก่อน'); return; }
     if (state.health) clearTimeout(state.health.timer);
     const requestId = crypto.randomUUID();
@@ -41,12 +43,12 @@
     if (!result || result.channel !== 'earn-arm-guestbook' || typeof result.ok !== 'boolean') return;
     if (state.health && result.requestId === state.health.requestId) {
       clearTimeout(state.health.timer); state.health = null;
-      if (result.ok) { state.ready = true; $('#submitButton').disabled = state.busy; status('พร้อมรับคำอวยพรของคุณแล้ว ♡', true); }
+      if (result.ok) { state.ready = true; sendButtons().forEach(button => button.disabled = state.busy); status('พร้อมรับคำอวยพรของคุณแล้ว ♡', true); }
       else status('สมุดคำอวยพรยังไม่พร้อมรับข้อความ กรุณากลับมาอีกครั้ง');
       return;
     }
     if (!state.pending || result.requestId !== state.pending.requestId) return;
-    clearTimeout(state.pending.timer); state.pending = null; setBusy(false);
+    clearTimeout(state.pending.timer); state.pending = null; setBusy(false); status('พร้อมรับคำอวยพรของคุณแล้ว ♡', true);
     if (!result.ok) { showError(result.error || 'ยังบันทึกไม่สำเร็จ กรุณาลองอีกครั้ง'); return; }
     state.saved = true; showError(''); $('#formCard').hidden = true; $('#successCard').hidden = false;
     $('#savedReference').textContent = 'รหัสคำอวยพร: ' + result.requestId.slice(0, 8).toUpperCase();
@@ -110,50 +112,80 @@
   $('#closeQr').addEventListener('click', () => $('#qrDialog').close());
   $('#accountName').textContent = cfg.accountName;
   $('#promptpayNumber').textContent = cfg.promptPay.replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2 $3');
-  function showPostcard() {
+  async function showPostcard() {
     const name = $('#guestName').value.trim(); const message = $('#blessing').value.trim();
     if (!name || !message) { showError('ใส่ชื่อและข้อความอวยพร เพื่อดูตัวอย่างโปสการ์ด'); $('#guestName').focus(); return; }
-    $('#postcardWish').textContent = message; $('#postcardFrom').textContent = 'ด้วยความปรารถนาดีจาก ' + name;
-    $('#postcardPhoto').hidden = !state.photo; if (state.photo) $('#postcardPhoto').src = state.photo; else $('#postcardPhoto').removeAttribute('src');
-    $('#postcardStatus').textContent = state.saved ? 'โปสการ์ดความทรงจำ · บันทึกคำอวยพรแล้ว' : 'ตัวอย่างโปสการ์ด · ยังไม่ได้ส่งคำอวยพร';
-    $('#postcardDialog').showModal();
+    if (state.preparing) { showError('กำลังเตรียมรูป กรุณารอสักครู่'); return; }
+    try {
+      state.postcard = await drawPostcard(name, message);
+      $('#postcardImage').src = state.postcard.toDataURL('image/jpeg', .9);
+      $('#postcardStatus').textContent = state.saved ? 'โปสการ์ดความทรงจำ · บันทึกคำอวยพรแล้ว' : 'ตัวอย่างโปสการ์ด · ยังไม่ได้ส่งคำอวยพร';
+      $('#postcardDialog').showModal();
+    } catch { toast('สร้างโปสการ์ดไม่สำเร็จ กรุณาลองอีกครั้ง'); }
   }
   $('#previewButton').addEventListener('click', showPostcard); $('#successPostcard').addEventListener('click', showPostcard); $('#closePostcard').addEventListener('click', () => $('#postcardDialog').close());
   function wrapText(context, text, maxWidth) {
     const lines = [];
-    const segmenter = typeof Intl.Segmenter === 'function' ? new Intl.Segmenter('th', { granularity: 'grapheme' }) : null;
+    // Thai has no spaces between words, so break lines at the word boundaries the browser finds.
+    const segmenter = typeof Intl.Segmenter === 'function' ? new Intl.Segmenter('th', { granularity: 'word' }) : null;
     for (const paragraph of text.split('\n')) {
-      let line = ''; const parts = segmenter ? [...segmenter.segment(paragraph)].map(part => part.segment) : [...paragraph];
-      for (const part of parts) { if (line && context.measureText(line + part).width > maxWidth) { lines.push(line); line = part; } else line += part; }
-      lines.push(line);
+      let line = ''; const parts = segmenter ? [...segmenter.segment(paragraph)].map(part => part.segment) : paragraph.split(/(\s+)/);
+      for (const part of parts) {
+        if (!line && !part.trim()) continue;
+        if (line && context.measureText(line + part).width > maxWidth) { lines.push(line.trimEnd()); line = part.trimStart(); } else line += part;
+        while (context.measureText(line).width > maxWidth) { let cut = line.length - 1; while (cut > 1 && context.measureText(line.slice(0, cut)).width > maxWidth) cut--; lines.push(line.slice(0, cut)); line = line.slice(cut); }
+      }
+      lines.push(line.trimEnd());
     }
     return lines;
+  }
+  // The postcard is drawn once on a canvas; the preview shows that same picture and the download saves it.
+  function archPath(ctx, x, y, w, h) { const r = w / 2; ctx.beginPath(); ctx.moveTo(x, y + h); ctx.lineTo(x, y + r); ctx.arc(x + r, y + r, r, Math.PI, 0); ctx.lineTo(x + w, y + h); ctx.closePath(); }
+  function drawPetal(ctx, x, y, r, angle, color) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(angle); ctx.beginPath(); ctx.moveTo(0, -r); ctx.quadraticCurveTo(r * .95, -r * .15, 0, r); ctx.quadraticCurveTo(-r * .95, -r * .15, 0, -r);
+    ctx.fillStyle = color; ctx.fill(); ctx.strokeStyle = 'rgba(156,90,60,.18)'; ctx.lineWidth = 1.5; ctx.stroke(); ctx.restore();
+  }
+  async function drawPostcard(name, message) {
+    await Promise.all(['700 42px "Charm"', '40px "Noto Serif Thai"', '26px "Noto Sans Thai"'].map(font => document.fonts.load(font)));
+    const [logo, photo] = await Promise.all([loadImage('assets/earn-arm-monogram.png'), state.photo ? loadImage(state.photo) : null]);
+    const canvas = document.createElement('canvas'); canvas.width = 1200; canvas.height = 1600; const ctx = canvas.getContext('2d');
+    const paper = ctx.createLinearGradient(0, 0, 0, 1600); paper.addColorStop(0, '#fbe2d2'); paper.addColorStop(.45, '#fff8f1'); paper.addColorStop(1, '#fdf0e5'); ctx.fillStyle = paper; ctx.fillRect(0, 0, 1200, 1600);
+    const glow = ctx.createRadialGradient(600, 300, 0, 600, 300, 640); glow.addColorStop(0, 'rgba(255,211,143,.32)'); glow.addColorStop(1, 'rgba(255,211,143,0)'); ctx.fillStyle = glow; ctx.fillRect(0, 0, 1200, 1600);
+    // A few petals in the corners above the arch.
+    [[110, 130, 24, .5, '#f2aeb6'], [215, 78, 16, 2.1, '#f7c95c'], [80, 270, 18, 1.2, '#fff3e6'], [262, 170, 12, 2.8, '#e7b48f'], [1090, 130, 24, -.6, '#f7c95c'], [985, 78, 16, -2.2, '#f2aeb6'], [1120, 270, 18, -1.1, '#e7b48f'], [938, 170, 12, -2.7, '#fff3e6']]
+      .forEach(([x, y, r, angle, color]) => drawPetal(ctx, x, y, r, angle, color));
+    ctx.strokeStyle = '#c99a72'; ctx.lineWidth = 4; archPath(ctx, 54, 54, 1092, 1492); ctx.stroke();
+    ctx.strokeStyle = 'rgba(201,154,114,.45)'; ctx.lineWidth = 2; archPath(ctx, 76, 76, 1048, 1448); ctx.stroke();
+    let area;
+    if (photo) {
+      ctx.drawImage(logo, 500, 150, 200, 200 * logo.height / logo.width);
+      const x = 290, y = 330, w = 620, h = 580;
+      ctx.save(); ctx.shadowColor = 'rgba(110,60,30,.22)'; ctx.shadowBlur = 40; ctx.shadowOffsetY = 16; archPath(ctx, x, y, w, h); ctx.fillStyle = '#fffaf3'; ctx.fill(); ctx.restore();
+      ctx.save(); archPath(ctx, x, y, w, h); ctx.clip(); const scale = Math.max(w / photo.width, h / photo.height); ctx.drawImage(photo, x + (w - photo.width * scale) / 2, y + (h - photo.height * scale) / 2, photo.width * scale, photo.height * scale); ctx.restore();
+      ctx.strokeStyle = '#d9b496'; ctx.lineWidth = 2; archPath(ctx, x - 16, y - 16, w + 32, h + 32); ctx.stroke();
+      area = { top: 975, bottom: 1270, largest: 46 };
+    } else {
+      const height = 400 * logo.height / logo.width; ctx.drawImage(logo, 400, 200, 400, height);
+      area = { top: 560, bottom: 1250, largest: 60 };
+    }
+    ctx.textAlign = 'center'; ctx.fillStyle = '#5e3424';
+    let size = area.largest, lines;
+    for (; size >= 22; size -= 2) { ctx.font = size + 'px "Noto Serif Thai"'; lines = wrapText(ctx, message, 860); if (lines.length * size * 1.75 <= area.bottom - area.top) break; }
+    const lineHeight = size * 1.75, first = area.top + (area.bottom - area.top - lines.length * lineHeight) / 2 + lineHeight * .72;
+    lines.forEach((line, index) => ctx.fillText(line, 600, first + index * lineHeight));
+    const divider = area.bottom + 34;
+    ctx.strokeStyle = '#d2a77f'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(500, divider); ctx.lineTo(574, divider); ctx.moveTo(626, divider); ctx.lineTo(700, divider); ctx.stroke();
+    ctx.fillStyle = '#c27a52'; ctx.font = '30px "Noto Sans Thai"'; ctx.fillText('♡', 600, divider + 10);
+    const from = 'ด้วยความปรารถนาดีจาก ' + name; let fromSize = 42;
+    for (; fromSize > 28; fromSize -= 2) { ctx.font = '700 ' + fromSize + 'px "Charm"'; if (ctx.measureText(from).width <= 880) break; }
+    ctx.fillStyle = '#7a3e2a'; wrapText(ctx, from, 880).slice(0, 2).forEach((line, index, all) => ctx.fillText(line, 600, divider + (all.length > 1 ? 66 : 80) + index * 46));
+    ctx.fillStyle = '#a07a5a'; ctx.font = '26px "Noto Sans Thai"'; ctx.fillText('เสาร์ที่ 23 มกราคม 2570', 600, 1478);
+    return canvas;
   }
   $('#downloadPostcard').addEventListener('click', async () => {
     const button = $('#downloadPostcard'); button.disabled = true; button.textContent = 'กำลังเตรียมโปสการ์ด…';
     try {
-      await Promise.all(['italic 44px "Cormorant Garamond"', '500 130px "Cormorant Garamond"', '150px "Great Vibes"', '700 40px "Charm"', '38px "Noto Serif Thai"'].map(font => document.fonts.load(font)));
-      const canvas = document.createElement('canvas'); canvas.width = 1200; canvas.height = 1600; const ctx = canvas.getContext('2d');
-      const paper = ctx.createLinearGradient(0, 0, 0, 1600); paper.addColorStop(0, '#fbe4d6'); paper.addColorStop(.7, '#fffaf3'); ctx.fillStyle = paper; ctx.fillRect(0, 0, 1200, 1600);
-      if (state.photo) {
-        const image = await loadImage(state.photo); const scale = Math.max(1200 / image.width, 1600 / image.height); ctx.drawImage(image, (1200 - image.width * scale) / 2, (1600 - image.height * scale) / 2, image.width * scale, image.height * scale);
-        const gradient = ctx.createLinearGradient(0, 0, 0, 1600); gradient.addColorStop(0, 'rgba(255,250,244,.94)'); gradient.addColorStop(.35, 'rgba(255,250,244,.88)'); gradient.addColorStop(1, 'rgba(255,250,244,.98)'); ctx.fillStyle = gradient; ctx.fillRect(0, 0, 1200, 1600);
-      }
-      // The same arch as the printed card and the postcard preview.
-      const arch = inset => { const r = 600 - inset; ctx.beginPath(); ctx.moveTo(inset, 1600 - inset); ctx.lineTo(inset, inset + r); ctx.arc(600, inset + r, r, Math.PI, 0); ctx.lineTo(1200 - inset, 1600 - inset); ctx.closePath(); ctx.stroke(); };
-      ctx.strokeStyle = '#c99a72'; ctx.lineWidth = 4; arch(54); ctx.strokeStyle = 'rgba(201,154,114,.45)'; ctx.lineWidth = 2; arch(78);
-      ctx.textAlign = 'center'; ctx.fillStyle = '#9c7353'; ctx.font = 'italic 44px "Cormorant Garamond"'; ctx.fillText('A little wish for your forever', 600, 430);
-      ctx.textAlign = 'left'; ctx.font = '500 130px "Cormorant Garamond"'; const earn = ctx.measureText('Earn ').width, arm = ctx.measureText(' Arm').width; ctx.font = '150px "Great Vibes"'; const amp = ctx.measureText('&').width;
-      let x = 600 - (earn + amp + arm) / 2; ctx.fillStyle = '#5e3424'; ctx.font = '500 130px "Cormorant Garamond"'; ctx.fillText('Earn ', x, 570); x += earn;
-      ctx.fillStyle = '#c27a52'; ctx.font = '150px "Great Vibes"'; ctx.fillText('&', x, 575); x += amp; ctx.fillStyle = '#5e3424'; ctx.font = '500 130px "Cormorant Garamond"'; ctx.fillText(' Arm', x, 570);
-      ctx.textAlign = 'center'; ctx.fillStyle = '#65402f';
-      const message = $('#blessing').value.trim(); let fontSize = 38, lines;
-      do { ctx.font = fontSize + 'px "Noto Serif Thai"'; lines = wrapText(ctx, message, 920); if (lines.length * fontSize * 1.8 <= 660) break; fontSize -= 2; } while (fontSize >= 16);
-      const lineHeight = fontSize * 1.8, startY = 640 + (660 - lines.length * lineHeight) / 2 + lineHeight * .75;
-      lines.forEach((line, index) => ctx.fillText(line, 600, startY + index * lineHeight));
-      ctx.fillStyle = '#7a3e2a'; ctx.font = '700 40px "Charm"'; wrapText(ctx, 'ด้วยความปรารถนาดีจาก ' + $('#guestName').value.trim(), 920).forEach((line, index) => ctx.fillText(line, 600, 1385 + index * 56));
-      ctx.fillStyle = '#9c7353'; ctx.font = 'italic 34px "Cormorant Garamond"'; ctx.fillText('23 January 2027', 600, 1490);
-      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png')); if (!blob) throw new Error('Canvas export failed');
+      const blob = await new Promise(resolve => state.postcard.toBlob(resolve, 'image/png')); if (!blob) throw new Error('Canvas export failed');
       const url = URL.createObjectURL(blob), link = document.createElement('a'); link.href = url; link.download = 'Earn-Arm-Wedding-Wish.png'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 30000); toast('บันทึกโปสการ์ดแล้ว ♡');
     } catch { toast('สร้างโปสการ์ดไม่สำเร็จ กรุณาลองอีกครั้ง'); } finally { button.disabled = false; button.textContent = 'ดาวน์โหลดโปสการ์ด ↓'; }
   });

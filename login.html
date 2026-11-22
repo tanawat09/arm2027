@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#fffaf4">
+  <meta name="robots" content="noindex,nofollow">
+  <title>เข้าสู่หลังบ้าน — Earn & Arm</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Thai:wght@400;500&family=Charm:wght@700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="admin.css">
+  <script src="admin-auth.js"></script>
+  <script src="login.js" defer></script>
+</head>
+<body class="login-page">
+  <main class="login-card">
+    <img class="login-logo" src="assets/earn-arm-monogram.png" alt="Earn & Arm" width="483" height="337">
+    <h1>หลังบ้านการ์ดเชิญ</h1>
+    <p class="login-intro">สำหรับคู่บ่าวสาวเท่านั้น</p>
+    <form id="loginForm" novalidate>
+      <label class="field"><span>รหัสผ่าน</span><input type="password" id="password" autocomplete="current-password" required autofocus></label>
+      <label class="login-remember"><input type="checkbox" id="remember"> จำไว้ในเครื่องนี้</label>
+      <p class="login-error" id="loginError" role="alert" hidden></p>
+      <button class="button" id="loginButton" type="submit">เข้าสู่หลังบ้าน</button>
+    </form>
+    <p class="login-setup" id="loginSetup" hidden>ยังไม่ได้ตั้งรหัสผ่าน ให้รันคำสั่ง <code>node scripts/set-admin-password.cjs</code> ในโฟลเดอร์โปรเจกต์ แล้วนำไฟล์ <code>admin-auth.js</code> ขึ้นเว็บ</p>
+    <a class="login-back" href="index.html">← กลับไปหน้าการ์ด</a>
+  </main>
+</body>
+</html>
