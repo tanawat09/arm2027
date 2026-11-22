@@ -8,7 +8,7 @@
   const SCRIPT = 'https://script.google.com/home/projects/1DEpL6LbP3lzOOUHTaHgENi-xImPTYFa5wBAgvTerzoBSU0LOyj7uSaw5/edit';
   const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
   const frame = $('#preview');
-  let siteHtml = '', initial = null, cfg = null, db = null, saveTimer = 0, previewTimer = 0, previewReady = false, toastTimer = 0;
+  let siteHtml = '', publishedSnapshot = '', initial = null, cfg = null, db = null, saveTimer = 0, previewTimer = 0, previewReady = false, toastTimer = 0;
 
   function notify(message) { $('#toast').textContent = message; $('#toast').hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => $('#toast').hidden = true, 4200); }
   function safeUrl(value) { try { const u = new URL(value); return u.protocol === 'https:' || u.protocol === 'http:' ? u.href : ''; } catch { return ''; } }
@@ -42,7 +42,8 @@
     $('#videoStatus').textContent = cfg.video ? 'วิดีโอ: ' + cfg.videoName : cfg.youtube ? 'ใช้วิดีโอจาก YouTube' : 'ยังไม่ได้เพิ่มวิดีโอ';
     $('#youtubeMusicSettings').hidden = cfg.musicSource !== 'youtube'; $('#fileMusicSettings').hidden = cfg.musicSource === 'youtube'; $('#musicSource').value = cfg.musicSource || 'file';
     $('#musicTimingHint').textContent = musicIsBlocked() ? 'คลิปนี้ไม่อนุญาตให้ฝัง: ลิงก์เปิด YouTube จะเริ่มตามเวลาที่เลือก ส่วนเวลาจบและวนซ้ำใช้ได้เมื่อคลิปอนุญาตให้ฝัง หรือเลือกไฟล์เพลง' : 'เลือกเวลาเริ่ม–จบเพื่อฟังและเล่นช่วงที่เลือกวนซ้ำ';
-    const draft = JSON.stringify(cfg) !== JSON.stringify(initial);
+    // Compared with what was last published from this browser, or else with the card on the web.
+    const draft = JSON.stringify(cfg) !== (publishedSnapshot || JSON.stringify(initial));
     $('#draftNote').hidden = !draft;
     $('#draftNote').textContent = 'มีการแก้ไขที่ยังไม่ได้นำขึ้นเว็บ แขกยังเห็นการ์ดฉบับเดิมจนกว่าจะนำ index.html ฉบับใหม่ขึ้นเว็บ';
   }
@@ -50,6 +51,7 @@
   // Drafts stay in this browser only, under the same name the card page used before, so earlier drafts carry over.
   function initDB() { return new Promise((resolve, reject) => { const request = indexedDB.open('ever-after-wedding-draft-' + (initial.draftId || 'v1'), 1); request.onupgradeneeded = () => request.result.createObjectStore('draft'); request.onsuccess = () => resolve(request.result); request.onerror = () => reject(request.error); }); }
   function scheduleSave() { clearTimeout(saveTimer); $('#saveStatus').textContent = 'กำลังบันทึกร่าง…'; saveTimer = setTimeout(saveDraft, 450); }
+  function savePublished() { if (!db) return Promise.resolve(); return new Promise(resolve => { const tx = db.transaction('draft', 'readwrite'); tx.objectStore('draft').put(publishedSnapshot, 'published'); tx.oncomplete = tx.onerror = () => resolve(); }); }
   function saveDraft() {
     if (!db) { $('#saveStatus').textContent = 'เบราว์เซอร์นี้บันทึกร่างไม่ได้ ดาวน์โหลดไฟล์เพื่อเก็บงาน'; return Promise.resolve(false); }
     return new Promise(resolve => {
@@ -197,6 +199,62 @@
     return html.replace(/assets\/[\w.-]+/g, path => inline[path]);
   }
   function download(text, name) { const url = URL.createObjectURL(new Blob([text], { type: 'text/html;charset=utf-8' })); const a = document.createElement('a'); a.href = url; a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 30000); }
+  // Publishing: uploaded pictures, songs and videos become files under assets/uploads/, and the card page with
+  // this draft is committed to the web branch (gh-pages) and to the project branch (main, under dist/) in one go.
+  const GITHUB = { owner: 'tanawat09', repo: 'arm2027', targets: [{ branch: 'gh-pages', prefix: '' }, { branch: 'main', prefix: 'dist/' }] };
+  const TOKEN_KEY = 'earn-arm-github-token';
+  const readToken = () => { try { return localStorage.getItem(TOKEN_KEY) || ''; } catch { return ''; } };
+  async function github(path, token, options = {}) {
+    const response = await fetch('https://api.github.com/repos/' + GITHUB.owner + '/' + GITHUB.repo + path, { ...options, headers: { Accept: 'application/vnd.github+json', Authorization: 'Bearer ' + token, 'X-GitHub-Api-Version': '2022-11-28', ...(options.body ? { 'Content-Type': 'application/json' } : {}) } });
+    const data = response.status === 204 ? null : await response.json().catch(() => null);
+    if (!response.ok) throw Object.assign(Error(data?.message || 'GitHub ' + response.status), { status: response.status });
+    return data;
+  }
+  async function checkToken(token) { const repo = await github('', token); if (!repo.permissions?.push) throw Error('token นี้ไม่มีสิทธิ์เขียน repo ' + GITHUB.repo); return repo; }
+  function renderGithubState() {
+    const token = readToken();
+    $('#githubState').textContent = token ? 'เชื่อม GitHub แล้วในเครื่องนี้ กด “บันทึกขึ้นเว็บ” ได้เลย' : 'ยังไม่ได้เชื่อม ใส่ token ด้านล่างก่อนบันทึกขึ้นเว็บครั้งแรก';
+    $('#githubState').classList.toggle('is-on', !!token); $('#githubForget').hidden = !token; $('#githubToken').value = '';
+  }
+  const EXTENSIONS = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'audio/mpeg': 'mp3', 'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/wav': 'wav', 'audio/ogg': 'ogg', 'video/mp4': 'mp4', 'video/webm': 'webm' };
+  async function uploadPath(dataUrl) {
+    const mime = dataUrl.slice(5, dataUrl.indexOf(';'));
+    const digest = new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(dataUrl)));
+    return 'assets/uploads/' + [...digest.slice(0, 8)].map(b => b.toString(16).padStart(2, '0')).join('') + '.' + (EXTENSIONS[mime] || 'bin');
+  }
+  // A copy of the draft where every uploaded file points at its path on the web, plus the files to send.
+  async function publishedCopy() {
+    const out = structuredClone(cfg), files = new Map();
+    const swap = async value => { if (typeof value !== 'string' || !value.startsWith('data:')) return value; const path = await uploadPath(value); files.set(path, value.slice(value.indexOf(',') + 1)); return path; };
+    for (const key of ['heroImage', 'storyImage', 'originalImage', 'music', 'video']) out[key] = await swap(out[key]);
+    for (const photo of out.gallery || []) { photo.src = await swap(photo.src); delete photo.bytes; }
+    return { out, files };
+  }
+  async function publish(progress) {
+    const token = readToken();
+    if (!token) { switchTab('share'); setView('edit'); $('#githubTitle').scrollIntoView({ block: 'start', behavior: 'smooth' }); throw Object.assign(Error('no-token'), { quiet: true }); }
+    if (!commitMusicTiming(cfg.musicSource === 'youtube' ? 'youtube' : 'file', true)) throw Object.assign(Error('timing'), { quiet: true });
+    progress('กำลังเตรียมไฟล์…');
+    const { out, files } = await publishedCopy();
+    const json = JSON.stringify(out).replaceAll('<', '\\u003c');
+    const page = siteHtml.replace(/(<script type="application\/json" id="card-data">)[\s\S]*?(<\/script>)/, (_, open, close) => open + json + close);
+    // Blobs belong to the whole repo, so each file is sent once and used on both branches.
+    const blobs = new Map(); let sent = 0;
+    for (const [path, base64] of files) { progress('กำลังอัปโหลดไฟล์ ' + (++sent) + ' / ' + files.size + '…'); blobs.set(path, (await github('/git/blobs', token, { method: 'POST', body: JSON.stringify({ content: base64, encoding: 'base64' }) })).sha); }
+    const pageBlob = (await github('/git/blobs', token, { method: 'POST', body: JSON.stringify({ content: page, encoding: 'utf-8' }) })).sha;
+    for (const target of GITHUB.targets) {
+      progress('กำลังบันทึกลง ' + target.branch + '…');
+      const head = (await github('/git/ref/heads/' + target.branch, token)).object.sha;
+      const baseTree = (await github('/git/commits/' + head, token)).tree.sha;
+      const tree = [{ path: target.prefix + 'index.html', mode: '100644', type: 'blob', sha: pageBlob }, ...[...blobs].map(([path, sha]) => ({ path: target.prefix + path, mode: '100644', type: 'blob', sha }))];
+      const newTree = (await github('/git/trees', token, { method: 'POST', body: JSON.stringify({ base_tree: baseTree, tree }) })).sha;
+      const commit = (await github('/git/commits', token, { method: 'POST', body: JSON.stringify({ message: 'Update the card from the owner page', tree: newTree, parents: [head] }) })).sha;
+      await github('/git/refs/heads/' + target.branch, token, { method: 'PATCH', body: JSON.stringify({ sha: commit }) });
+    }
+    siteHtml = page; initial = structuredClone(out); publishedSnapshot = JSON.stringify(cfg);
+    await saveDraft(); await savePublished(); renderStatus();
+  }
+
   async function withButton(button, busyText, work) {
     const label = button.textContent; button.disabled = true; button.textContent = busyText;
     try { await work(); } catch { notify('เตรียมไฟล์ไม่สำเร็จ กรุณาลองใหม่เมื่ออินเทอร์เน็ตพร้อม'); } finally { button.disabled = false; button.textContent = label; }
@@ -234,6 +292,21 @@
     $$('[data-field]').forEach(e => e.addEventListener('input', () => { const key = e.dataset.field; if (key === 'date' && !validDate(e.value) || key === 'start' && !e.value) return; cfg[key] = e.value; changed(); }));
     $('#demoCheck').addEventListener('change', e => { cfg.demo = e.target.checked; changed(); });
     bindGallery();
+    $('#githubSave').addEventListener('click', e => withButton(e.currentTarget, 'กำลังตรวจ token…', async () => {
+      const token = $('#githubToken').value.trim(); if (!token) { notify('วาง token ก่อนกดเชื่อม'); return; }
+      try { await checkToken(token); } catch (error) { notify(error.status === 401 ? 'token ไม่ถูกต้องหรือหมดอายุ' : error.status === 404 ? 'token นี้เข้า repo ' + GITHUB.repo + ' ไม่ได้' : error.message); return; }
+      try { localStorage.setItem(TOKEN_KEY, token); } catch { notify('เบราว์เซอร์นี้จำ token ไม่ได้'); return; }
+      renderGithubState(); notify('เชื่อม GitHub แล้ว');
+    }));
+    $('#githubForget').addEventListener('click', () => { try { localStorage.removeItem(TOKEN_KEY); } catch {} renderGithubState(); notify('เลิกเชื่อม GitHub ในเครื่องนี้แล้ว'); });
+    $('#publishButton').addEventListener('click', async e => {
+      const button = e.currentTarget, label = button.textContent; button.disabled = true;
+      try { await publish(text => { button.textContent = text; $('#saveStatus').textContent = text; }); $('#saveStatus').textContent = 'บันทึกขึ้นเว็บแล้ว ✓ แขกจะเห็นภายใน 1–2 นาที'; notify('บันทึกขึ้นเว็บแล้ว แขกจะเห็นการ์ดใหม่ภายใน 1–2 นาที'); }
+      catch (error) {
+        if (error.message === 'no-token') notify('เชื่อม GitHub ก่อน แล้วกดบันทึกขึ้นเว็บอีกครั้ง');
+        else if (!error.quiet) { $('#saveStatus').textContent = 'บันทึกขึ้นเว็บไม่สำเร็จ'; notify(error.status === 401 ? 'token หมดอายุหรือถูกยกเลิก กรุณาเชื่อม GitHub ใหม่' : 'บันทึกขึ้นเว็บไม่สำเร็จ: ' + error.message); }
+      } finally { button.disabled = false; button.textContent = label; }
+    });
     $('#musicUpload').addEventListener('change', async e => { const file = await readMedia(e.target, 'audio', 15); if (file) { cfg.music = file.url; cfg.musicName = file.name; cfg.musicSource = 'file'; changed(); notify('เพิ่มเพลงแล้ว แตะปุ่มเพลงในตัวอย่างเพื่อฟัง'); } });
     $('#resetMusic').addEventListener('click', () => { cfg.music = initial.music; cfg.musicName = initial.musicName; cfg.musicSource = 'file'; $('#musicUpload').value = ''; changed(); });
     $('#musicYoutubeInput').addEventListener('change', e => { const value = e.target.value.trim(); if (!youtubeId(value)) { e.target.setCustomValidity('กรุณาใส่ลิงก์ YouTube ที่ถูกต้อง'); e.target.reportValidity(); return; } e.target.setCustomValidity(''); cfg.musicYoutube = value; cfg.musicTitle = youtubeId(value) === 'WtcKJtwMD2E' ? 'ดาวหางฮัลเลย์ — fellow fellow' : 'เพลงของเรา · YouTube'; cfg.musicSource = 'youtube'; changed(); });
@@ -268,13 +341,14 @@
     cfg = structuredClone(initial);
     try {
       db = await initDB();
+      publishedSnapshot = await new Promise(resolve => { const r = db.transaction('draft').objectStore('draft').get('published'); r.onsuccess = () => resolve(r.result || ''); r.onerror = () => resolve(''); });
       const saved = await new Promise((resolve, reject) => { const r = db.transaction('draft').objectStore('draft').get('current'); r.onsuccess = () => resolve(r.result); r.onerror = reject; });
       if (saved && validDate(saved.date)) {
         cfg = { ...cfg, ...saved }; delete cfg.guestMode;
         if (saved.musicRevision !== initial.musicRevision) for (const key of ['music', 'musicName', 'musicSource', 'fileStart', 'fileEnd', 'fileLoop', 'musicRevision']) cfg[key] = initial[key];
       }
     } catch { db = null; }
-    bindEditor(); populateEditor(); renderStatus(); renderLinks(); setSize('phone'); sendPreview();
+    bindEditor(); populateEditor(); renderGithubState(); renderStatus(); renderLinks(); setSize('phone'); sendPreview();
     $('#saveStatus').textContent = db ? 'ร่างบันทึกอัตโนมัติในเบราว์เซอร์นี้' : 'เบราว์เซอร์นี้บันทึกร่างไม่ได้ ดาวน์โหลดไฟล์เพื่อเก็บงาน';
   }
   init();
